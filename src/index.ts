@@ -7,3 +7,6 @@ export { TheApi } from './core/api';
 export { THEME_CSS } from './core/theme';
 export { TheTemplateStudio } from './mail/the-template-studio';
 export { TheMailAccounts } from './mail/the-mail-accounts';
+export { TheMailHealth } from './mail/the-mail-health';
+export { TheMailSchedules } from './mail/the-mail-schedules';
+export { TheMailLog } from './mail/the-mail-log';

@@ -31,6 +31,22 @@ Attributes every component understands: `api` (backend base URL, default same si
 `session-key` (localStorage key sent as `X-Session-Id`, default `session_id`), `theme`
 (`light` / `dark`, default follows the system).
 
+## Mail components and the_campaign
+
+Mail components talk to the host app, never to the_campaign directly: the host keeps the
+the_campaign site key and forwards an allow-list of paths:
+
+| Component | Calls (on the host) | Forwarded to the_campaign |
+|---|---|---|
+| the-mail-accounts | `{endpoint}/providers…` | `/v1/presets`, `/v1/providers…` |
+| the-mail-health | `{endpoint}/v1/health` | `/v1/health` |
+| the-mail-schedules | `{endpoint}/v1/schedules`, `/v1/templates` | same |
+| the-mail-log | `{endpoint}/v1/sends`, `/v1/events`, `/v1/suppressions` | same |
+| the-template-studio | `/api/isuper/email-template/ai-*`, `/api/isuper/email/ai-template` | (app's own AI) |
+
+`endpoint` defaults to intaxing's `/api/isuper/email-template/campaign`. Reference PHP for intaxing:
+`docs/intaxing-backend.php` (not installed).
+
 ## Look per app
 
 Only CSS variables change; the rest is inside the component's shadow DOM:

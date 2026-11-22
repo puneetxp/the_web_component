@@ -152,3 +152,84 @@ window.fetch = async (input, init = {}) => {
   }
   return json({ success: false, message: "unknown" }, 404);
 };
+
+// ---- /v1 through the host's proxy: health, schedules, templates, sends, events, suppressions --
+const schedules = [
+  { id: "sch00000001", template_key: "services", status: "active", start_date: "2026-11-23", reserve: 40, filter: { min_score: 50 },
+    window: { days: [1, 2, 3, 4, 5, 6], from: "09:00", to: "19:00", timezone: "Asia/Kolkata" },
+    today: { date: "2026-11-23", planned: 60, queued: 38, sent: 21, failed: 1, next_send: new Date(Date.now() + 9 * 60e3).toISOString() } },
+];
+const sends = [
+  { id: "s1", email: "rahul@shop.in", template_key: "services", status: "sent", error: null, provider_id: "p1", purpose: "marketing", schedule_id: "sch00000001",
+    due_at: null, created_at: new Date(Date.now() - 50 * 60e3).toISOString() },
+  { id: "s2", email: "old.user@shop.in", template_key: "services", status: "bounced", error: null, provider_id: "p2", purpose: "marketing", schedule_id: "sch00000001",
+    due_at: null, created_at: new Date(Date.now() - 90 * 60e3).toISOString() },
+  { id: "s3", email: "priya@studio.in", template_key: "welcome", status: "sent", error: null, provider_id: "p1", purpose: "transactional", schedule_id: null,
+    due_at: null, created_at: new Date(Date.now() - 20 * 60e3).toISOString() },
+  { id: "s4", email: "next@co.in", template_key: "services", status: "queued", error: null, provider_id: "p1", purpose: "marketing", schedule_id: "sch00000001",
+    due_at: new Date(Date.now() + 9 * 60e3).toISOString(), created_at: new Date().toISOString() },
+];
+const events = [
+  { email: "old.user@shop.in", event: "hard_bounce", detail: "5.1.1 Recipient address rejected", created_at: new Date(Date.now() - 80 * 60e3).toISOString() },
+  { email: "rahul@shop.in", event: "opened", detail: null, created_at: new Date(Date.now() - 30 * 60e3).toISOString() },
+  { email: "-", event: "alert", detail: "Mailjet stopped for 24 h, 12 queued mails cancelled: Mailjet today: 5 hard bounces", created_at: new Date(Date.now() - 70 * 60e3).toISOString() },
+];
+const blocks = [
+  { business_id: "*", email: "old.user@shop.in", reason: "hard_bounce", detail: "mailbox bounce 5.1.1", created_at: new Date(Date.now() - 80 * 60e3).toISOString() },
+  { business_id: "b1", email: "nomail@co.in", reason: "unsubscribed", detail: "unsubscribe link", created_at: new Date(Date.now() - 3 * 86400e3).toISOString() },
+  { business_id: "b1", email: "test@co.in", reason: "manual", detail: null, created_at: new Date(Date.now() - 86400e3).toISOString() },
+];
+const before2 = window.fetch;
+window.fetch = async (input, init = {}) => {
+  const url = new URL(typeof input === "string" ? input : input.url, location.href);
+  const m = /\/campaign(\/v1\/.*)$/.exec(url.pathname);
+  if (!m) return before2(input, init);
+  await wait(300);
+  const path = m[1], q = url.searchParams, method = init.method ?? "GET";
+  const body = init.body ? JSON.parse(init.body) : {};
+  const email = (q.get("email") ?? "").toLowerCase();
+  if (path === "/v1/health") {
+    const paused = accounts.filter((a) => a.status === "paused");
+    return json({ ok: paused.length === 0, business: { name: "INTAX", status: "active", pause_reason: null, total_cap: 300 },
+      today: { sent: 45, cap: 250, remaining: 205 }, last_7_days: { sent: 812, hard_bounce: 9, spam: 0, spam_rate: 0, hard_bounce_rate: 0.0111 },
+      accounts: accounts.filter((a) => a.status !== "disabled").map((a) => ({ id: a.id, name: a.name, status: a.status, pause_reason: a.pause_reason,
+        resume_at: a.resume_at, ramp_level: a.ramp_level, per_day: a.per_day, sent_today: a.sent.today })),
+      paused: paused.length, cooling_down: paused.filter((a) => a.resume_at).length,
+      alerts: events.filter((e) => e.event === "alert").map((e) => ({ text: e.detail, at: e.created_at })) });
+  }
+  if (path === "/v1/templates") {
+    return json({ templates: [{ tpl_key: "services", name: "Services intro", subject: "Free GST billing for your business" },
+      { tpl_key: "welcome", name: "Welcome", subject: "Welcome to INTAX" }] });
+  }
+  if (path === "/v1/schedules" && method === "GET") return json({ schedules });
+  if (path === "/v1/schedules" && method === "POST") {
+    if (!body.window?.days?.length) return json({ error: "unprocessable", message: "window.days: ISO weekdays" }, 422);
+    const s = { id: "sch0000000" + (schedules.length + 1), template_key: body.template, status: "active", start_date: body.start_date, reserve: body.reserve,
+      filter: body.filter, window: { ...body.window, timezone: "Asia/Kolkata" }, today: { date: body.start_date, planned: 0, queued: 0, sent: 0, failed: 0, next_send: null } };
+    schedules.push(s);
+    return json({ schedule: s }, 201);
+  }
+  const sm = /^\/v1\/schedules\/(\w+)$/.exec(path);
+  if (sm && method === "PATCH") {
+    const s = schedules.find((x) => x.id === sm[1]);
+    const cancelled = body.status === "paused" ? s.today.queued : 0;
+    s.status = body.status;
+    if (cancelled) s.today.queued = 0;
+    return json({ schedule: s, cancelled });
+  }
+  if (path === "/v1/sends") {
+    return json({ sends: sends.filter((s) => (!email || s.email === email) && (!q.get("status") || s.status === q.get("status"))) });
+  }
+  if (path === "/v1/events") {
+    return json({ events: events.filter((e) => (!email || e.email === email) && (!q.get("event") || e.event === q.get("event"))) });
+  }
+  if (path === "/v1/suppressions") return json({ suppressions: blocks.filter((b) => !email || b.email === email) });
+  const dm = /^\/v1\/suppressions\/(.+)$/.exec(path);
+  if (dm && method === "DELETE") {
+    const i = blocks.findIndex((b) => b.email === decodeURIComponent(dm[1]) && b.reason === "manual");
+    if (i < 0) return json({ error: "not_found", message: "Not blocked by hand" }, 404);
+    blocks.splice(i, 1);
+    return json({ ok: true });
+  }
+  return json({ error: "not_found", message: "No such endpoint" }, 404);
+};

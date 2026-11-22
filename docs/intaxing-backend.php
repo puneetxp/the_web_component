@@ -135,3 +135,44 @@ SYS;
     }
 
 }
+
+// ---------------------------------------------------------------------------------------------
+// Proxy for <the-mail-health>, <the-mail-schedules>, <the-mail-log>: the components call
+// {endpoint}/v1/<path>; this forwards an allow-listed set of the_campaign /v1 paths with the site
+// key (the browser never sees it). Routes, one per method, in $email_routes:
+//     ['path' => '/email-template/campaign/v1/.+', 'method' => 'GET',    'handler' => [IsuperEmail_templateController::class, 'campaignProxy']],
+//     ['path' => '/email-template/campaign/v1/.+', 'method' => 'POST',   'handler' => [IsuperEmail_templateController::class, 'campaignProxy']],
+//     ['path' => '/email-template/campaign/v1/.+', 'method' => 'PATCH',  'handler' => [IsuperEmail_templateController::class, 'campaignProxy']],
+//     ['path' => '/email-template/campaign/v1/.+', 'method' => 'DELETE', 'handler' => [IsuperEmail_templateController::class, 'campaignProxy']],
+class IsuperEmail_templateController_ProxyMethod {
+    /** Which the_campaign paths the components may reach, per method. */
+    private const PROXY_ALLOW = [
+        'GET' => '#^/v1/(health|stats|templates|schedules(/[A-Za-z0-9]{8,40})?|sends|events|suppressions)$#',
+        'POST' => '#^/v1/schedules$#',
+        'PATCH' => '#^/v1/schedules/[A-Za-z0-9]{8,40}$#',
+        'DELETE' => '#^/v1/suppressions/[^/]+$#',
+    ];
+
+    public static function campaignProxy() {
+        $method = strtoupper($_SERVER['REQUEST_METHOD'] ?? 'GET');
+        $uri = parse_url($_SERVER['REQUEST_URI'] ?? '', PHP_URL_PATH) ?: '';
+        $pos = strpos($uri, '/campaign/v1/');
+        $path = $pos === false ? '' : substr($uri, $pos + strlen('/campaign'));
+        if (!isset(self::PROXY_ALLOW[$method]) || !preg_match(self::PROXY_ALLOW[$method], $path)) {
+            return Response::bad_req(['success' => false, 'message' => 'Not allowed']);
+        }
+        if (!CampaignClient::isConfigured()) {
+            return Response::bad_req(['success' => false, 'message' => 'Set the_campaign API URL and key first']);
+        }
+        $query = (string) (parse_url($_SERVER['REQUEST_URI'] ?? '', PHP_URL_QUERY) ?? '');
+        $raw = json_decode((string) file_get_contents('php://input'), true);
+        try {
+            $out = (new CampaignClient())->request($method, $path . ($query !== '' ? "?$query" : ''),
+                in_array($method, ['POST', 'PATCH'], true) ? (is_array($raw) ? $raw : []) : null);
+            return Response::json($out);
+        } catch (\RuntimeException $e) {
+            http_response_code($e->getCode() >= 400 && $e->getCode() < 600 ? $e->getCode() : 502);
+            return json_encode(['success' => false, 'message' => $e->getMessage()]);
+        }
+    }
+}

@@ -1,0 +1,27 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Mail admin demo</title>
+  <style>
+    body { margin: 0; padding: 24px 16px; background: #f1f5f9; font-family: system-ui, sans-serif; }
+    main { max-width: 980px; margin: 0 auto; display: grid; gap: 16px; }
+    /* One look for the whole page: set once on a parent, every component follows. */
+    main { --the-primary: #6d28d9; --the-radius: 14px; }
+  </style>
+</head>
+<body>
+<main>
+  <h1 style="margin:0;font-size:20px">Mail admin: all components on one page (fake backend)</h1>
+  <the-mail-health compact></the-mail-health>
+  <the-mail-health></the-mail-health>
+  <the-mail-accounts></the-mail-accounts>
+  <the-mail-schedules></the-mail-schedules>
+  <the-mail-log></the-mail-log>
+  <the-template-studio></the-template-studio>
+</main>
+<script src="./mock-backend.js"></script>
+<script type="module">import "../src/index.ts";</script>
+</body>
+</html>
