@@ -4,7 +4,7 @@
     "dev": "vite dev --base=./",
     "build:lib": "vite build --config vite.lib.config.js",
     "check": "tsc -p tsconfig.json",
-    "demo": "vite dev --base=./ --open /demo/template-studio.html",
+    "demo": "vite dev --base=./ --open /demo/index.html",
     "test": "vitest run"
   },
   "devDependencies": {

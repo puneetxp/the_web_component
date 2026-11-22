@@ -61,6 +61,9 @@ class TheHello extends TheElement<{ name: string; error: string }> {
 define("the-hello", TheHello);
 ```
 
+Don't name methods or fields like built-in element members (`role`, `remove`, `title`,
+`hidden`, `id`, `style`, `slot`, `dataset`…): a component is an HTMLElement and would replace them.
+
 Rules: data in `state`, markup from `view()` (escape every value with `esc`), changes through
 `set()`, results to the host as `the-…` events, server calls through `this.api()` to the host's
 own backend. No keys in attributes.
