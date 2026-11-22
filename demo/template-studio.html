@@ -1,0 +1,45 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>the-template-studio demo</title>
+  <style>
+    body { margin: 0; padding: 24px 16px; background: #f1f5f9; font-family: system-ui, sans-serif; }
+    main { max-width: 880px; margin: 0 auto; display: grid; gap: 16px; }
+    .themes { display: flex; gap: 8px; flex-wrap: wrap; }
+    .themes button { padding: 6px 12px; border-radius: 8px; border: 1px solid #cbd5e1; background: #fff; cursor: pointer; }
+    #log { font: 12px/1.4 ui-monospace, monospace; background: #0f172a; color: #e2e8f0; padding: 10px; border-radius: 8px; min-height: 48px; white-space: pre-wrap; }
+    /* One app's look: only variables change. */
+    the-template-studio.intaxing { --the-primary: #6d28d9; --the-radius: 14px; }
+    the-template-studio.intax { --the-primary: #047857; --the-radius: 6px; --the-font: Georgia, serif; }
+  </style>
+</head>
+<body>
+<main>
+  <h1 style="margin:0;font-size:20px">&lt;the-template-studio&gt; demo (fake backend)</h1>
+  <div class="themes">
+    <button data-theme="intaxing">intaxing look</button>
+    <button data-theme="intax">INTAX look</button>
+    <button data-theme="dark">dark</button>
+  </div>
+  <the-template-studio id="studio" class="intaxing"></the-template-studio>
+  <div id="log">Events from the component appear here.</div>
+</main>
+<script src="./mock-backend.js"></script>
+<script type="module">
+  import "../src/mail/the-template-studio.ts";
+  const el = document.getElementById("studio");
+  const log = (name, detail) => document.getElementById("log").textContent = `${name}\n${JSON.stringify(detail, null, 2)}`;
+  el.addEventListener("the-use-template", (e) => log("the-use-template", e.detail));
+  el.addEventListener("the-save-draft", (e) => log("the-save-draft", e.detail));
+  for (const b of document.querySelectorAll("[data-theme]")) {
+    b.addEventListener("click", () => {
+      const t = b.dataset.theme;
+      if (t === "dark") el.setAttribute("theme", el.getAttribute("theme") === "dark" ? "light" : "dark");
+      else el.className = t;
+    });
+  }
+</script>
+</body>
+</html>

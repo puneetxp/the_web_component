@@ -1,1 +1,16 @@
-{"scripts":{"build":"vite build --base=./","dev":"vite dev --base=./"},"devDependencies":{"vite":"^6.1.0"}}
+{
+  "scripts": {
+    "build": "vite build --base=./",
+    "dev": "vite dev --base=./",
+    "build:lib": "vite build --config vite.lib.config.js",
+    "check": "tsc -p tsconfig.json",
+    "demo": "vite dev --base=./ --open /demo/template-studio.html",
+    "test": "vitest run"
+  },
+  "devDependencies": {
+    "happy-dom": "^15.11.7",
+    "typescript": "^5.6.3",
+    "vite": "^6.1.0",
+    "vitest": "^2.1.9"
+  }
+}
