@@ -1,4 +1,4 @@
-import { define, esc, TheElement } from '../core/the-element';
+import { define, esc, TheElement, when } from '../core/the-element';
 
 /**
  * <the-mail-health api="https://intaxing.in" endpoint="/api/isuper/email-template/campaign" refresh="60" compact>
@@ -41,10 +41,6 @@ interface State {
 /** Same limits as the_campaign's health check: under these is safe, from these it holds or cuts. */
 const SAFE = { bounce: 0.02, spam: 0.001 };
 
-const when = (iso: string) => {
-  const d = new Date(iso);
-  return d.toLocaleString(undefined, { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' });
-};
 const pct = (x: number, digits = 1) => `${(100 * x).toFixed(digits)}%`;
 
 export class TheMailHealth extends TheElement<State> {

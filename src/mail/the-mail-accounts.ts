@@ -1,4 +1,4 @@
-import { define, esc, TheElement } from '../core/the-element';
+import { define, esc, TheElement, when } from '../core/the-element';
 
 /**
  * <the-mail-accounts api="https://intaxing.in" endpoint="/api/isuper/email-template/campaign">
@@ -271,6 +271,7 @@ export class TheMailAccounts extends TheElement<State> {
       td { border-top: 1px solid var(--_border); padding: 8px 8px 8px 0; vertical-align: top; }
       td.n, th.n { text-align: right; }
       .scroll { overflow-x: auto; }
+      .scroll table { min-width: 760px; }
       .why { border-left: 3px solid var(--_good); background: color-mix(in srgb, var(--_good) 8%, transparent); padding: 8px 10px; border-radius: 6px; font-size: 13px; }
       .status-paused { color: var(--_warn); } .status-disabled { color: var(--_muted); }
       .nowrap { white-space: nowrap; }
@@ -358,7 +359,7 @@ export class TheMailAccounts extends TheElement<State> {
       const busy = s.busy.endsWith(':' + a.id);
       const bounces = a.imap_host ? 'mailbox' : a.kind === 'brevo_api' ? 'webhook' : 'refusals only';
       const resume = a.status === 'paused' && a.resume_at
-        ? `<div class="muted">resumes ${esc(new Date(a.resume_at).toLocaleString())}</div>`
+        ? `<div class="muted">resumes ${esc(when(a.resume_at))}</div>`
         : '';
       return `<tr>
         <td>${esc(this.label(a))}<div class="muted">bounces: ${bounces}</div></td>

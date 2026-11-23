@@ -98,6 +98,19 @@ export function esc(v: unknown): string {
   );
 }
 
+/** A date and time the same way in every component: "23 Nov, 04:37 pm" (in the viewer's locale). */
+export function when(iso: string | null | undefined): string {
+  if (!iso) return '';
+  const d = new Date(iso);
+  return isNaN(d.getTime()) ? '' : d.toLocaleString(undefined, { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' });
+}
+
+/** Today in the viewer's time zone as YYYY-MM-DD (toISOString would give the UTC day). */
+export function localDate(d = new Date()): string {
+  const p = (n: number) => String(n).padStart(2, '0');
+  return `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())}`;
+}
+
 /** <option> list with one selected. */
 export function options(items: Record<string, string> | string[], selected: string): string {
   const entries = Array.isArray(items) ? items.map((v) => [v, v]) : Object.entries(items);

@@ -1,4 +1,4 @@
-import { define, esc, options, TheElement } from '../core/the-element';
+import { define, esc, localDate, options, TheElement } from '../core/the-element';
 
 /**
  * <the-mail-schedules api="https://intaxing.in" endpoint="/api/isuper/email-template/campaign">
@@ -50,7 +50,6 @@ interface State {
 }
 
 const DAY = ['', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
-const today = () => new Date().toISOString().slice(0, 10);
 
 export class TheMailSchedules extends TheElement<State> {
   protected state: State = {
@@ -65,7 +64,7 @@ export class TheMailSchedules extends TheElement<State> {
     region: '',
     category: '',
     minScore: '',
-    startDate: today(),
+    startDate: localDate(),
     days: [1, 2, 3, 4, 5, 6],
     from: '09:00',
     to: '19:00',

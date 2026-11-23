@@ -56,5 +56,10 @@ the_campaign endpoints the components use are live: `/v1/presets`, `/v1/provider
    app loads the same version; then INTAX (the_billing, SolidJS) and 0op.
 4. More components as the owner asks (the plan: many components for many kinds of things).
 
-Not tested yet: a real browser (no Chrome on the build machine; try `npx playwright install chromium`),
-the PHP endpoints against intaxing's real AI, and real provider logins.
+Browser-tested 2026-11-23 (headless Chromium via playwright-core, using Playwright's
+`chromium_headless_shell-1148` build with `--no-sandbox --disable-gpu --no-zygote`; `/usr/bin/chromium` and
+the Playwright MCP plugin don't start on this PRoot machine): every action of all 5 components on
+`demo/mail-admin.html` works, all `the-*` events fire with the right detail, no console errors; at 390 px
+wide the page doesn't scroll sideways, and dark mode is readable.
+
+Not tested yet: the PHP endpoints against intaxing's real AI, and real provider logins.

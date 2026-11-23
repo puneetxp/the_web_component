@@ -1,4 +1,4 @@
-import { define, esc, TheElement } from '../core/the-element';
+import { define, esc, TheElement, when } from '../core/the-element';
 
 /**
  * <the-mail-log api="https://intaxing.in" endpoint="/api/isuper/email-template/campaign">
@@ -71,8 +71,6 @@ const REASON: Record<string, string> = {
   invalid: 'Invalid / repeated soft bounces',
   manual: 'Blocked by hand',
 };
-const when = (iso: string | null) =>
-  iso ? new Date(iso).toLocaleString(undefined, { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' }) : '';
 
 export class TheMailLog extends TheElement<State> {
   protected state: State = {
@@ -164,6 +162,8 @@ export class TheMailLog extends TheElement<State> {
       th { text-align: left; font-weight: 600; color: var(--_muted); font-size: 12px; padding: 6px 8px 6px 0; }
       td { border-top: 1px solid var(--_border); padding: 7px 8px 7px 0; vertical-align: top; }
       .scroll { overflow-x: auto; }
+      .scroll table { min-width: 560px; }
+      td:first-child { white-space: nowrap; }
       .st-sent { color: var(--_good); } .st-failed, .st-bounced { color: var(--_bad); } .st-queued { color: var(--_muted); }
     `;
   }
