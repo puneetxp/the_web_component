@@ -28,6 +28,7 @@ interface Send {
   created_at: string;
 }
 interface EventRow {
+  send_id?: string | null;
   email: string;
   event: string;
   detail: string | null;
@@ -48,6 +49,7 @@ interface State {
   sends: Send[] | null;
   events: EventRow[] | null;
   blocked: Block[] | null;
+  expandedSendId: string;
   error: string;
   notice: string;
   busy: boolean;
@@ -56,12 +58,13 @@ interface State {
 const STATUS: Record<string, string> = { '': 'All', queued: 'Queued', sent: 'Sent', failed: 'Failed', bounced: 'Bounced' };
 const EVENTS: Record<string, string> = {
   '': 'All',
+  delivered: 'Delivered',
+  opened: 'Opened',
+  click: 'Clicked',
   hard_bounce: 'Hard bounce',
   soft_bounce: 'Soft bounce',
   spam: 'Complaint',
   unsubscribed: 'Unsubscribed',
-  opened: 'Opened',
-  click: 'Clicked',
   alert: 'Alerts',
 };
 const REASON: Record<string, string> = {
@@ -81,6 +84,7 @@ export class TheMailLog extends TheElement<State> {
     sends: null,
     events: null,
     blocked: null,
+    expandedSendId: '',
     error: '',
     notice: '',
     busy: false,
@@ -92,6 +96,10 @@ export class TheMailLog extends TheElement<State> {
     clear: () => {
       this.state.email = '';
       return this.load();
+    },
+    toggleSend: (el: HTMLElement) => {
+      const id = el.dataset['id'] || '';
+      this.set({ expandedSendId: this.state.expandedSendId === id ? '' : id });
     },
     unblock: (el: HTMLElement) => this.unblock(el.dataset['email']!),
   };
@@ -132,10 +140,12 @@ export class TheMailLog extends TheElement<State> {
     const api = this.api();
     const base = this.endpoint();
     if (s.tab === 'sends') {
-      const r = await api.get<{ sends: Send[] }>(`${base}/v1/sends${this.qs({ status: s.status, email, limit: '100' })}`);
-      // A searched address: also say at once whether it is blocked.
-      const b = email ? await api.get<{ suppressions: Block[] }>(`${base}/v1/suppressions${this.qs({ email })}`) : null;
-      this.set({ sends: r.sends ?? [], blocked: b ? b.suppressions : s.blocked, busy: false });
+      const [r, ev, b] = await Promise.all([
+        api.get<{ sends: Send[] }>(`${base}/v1/sends${this.qs({ status: s.status, email, limit: '100' })}`),
+        api.get<{ events: EventRow[] }>(`${base}/v1/events${this.qs({ email, limit: '200' })}`).catch(() => ({ events: [] })),
+        email ? api.get<{ suppressions: Block[] }>(`${base}/v1/suppressions${this.qs({ email })}`) : Promise.resolve(null),
+      ]);
+      this.set({ sends: r.sends ?? [], events: ev.events ?? s.events, blocked: b ? b.suppressions : s.blocked, busy: false });
     } else if (s.tab === 'events') {
       const r = await api.get<{ events: EventRow[] }>(`${base}/v1/events${this.qs({ event: s.event, email, limit: '100' })}`);
       this.set({ events: r.events ?? [], busy: false });
@@ -165,6 +175,14 @@ export class TheMailLog extends TheElement<State> {
       .scroll table { min-width: 560px; }
       td:first-child { white-space: nowrap; }
       .st-sent { color: var(--_good); } .st-failed, .st-bounced { color: var(--_bad); } .st-queued { color: var(--_muted); }
+      .trk { display: inline-flex; flex-wrap: wrap; gap: 4px; margin-top: 3px; }
+      .trk .open { color: var(--_good); border-color: color-mix(in srgb, var(--_good) 40%, var(--_border)); }
+      .trk .deliv { color: var(--_link); border-color: color-mix(in srgb, var(--_link) 35%, var(--_border)); }
+      .detail-row td { background: var(--_surface-2); padding: 10px 12px; }
+      .tl { display: grid; gap: 6px; font-size: 12px; }
+      .tl-item { display: flex; flex-wrap: wrap; gap: 8px; align-items: baseline; }
+      .tl-time { color: var(--_muted); min-width: 130px; font-variant-numeric: tabular-nums; }
+      .tl-ev { font-weight: 600; color: var(--_text); }
     `;
   }
 
@@ -206,11 +224,70 @@ export class TheMailLog extends TheElement<State> {
     const list = this.state.sends;
     if (!list) return '<div class="muted">Loading…</div>';
     if (!list.length) return `${this.blockNote()}<div class="muted">No mail found.</div>`;
+    const evs = this.state.events ?? [];
+    const bySend = new Map<string, EventRow[]>();
+    const byEmail = new Map<string, EventRow[]>();
+    for (const e of evs) {
+      if (e.send_id) {
+        if (!bySend.has(e.send_id)) bySend.set(e.send_id, []);
+        bySend.get(e.send_id)!.push(e);
+      }
+      if (e.email && e.email !== '-') {
+        const em = e.email.toLowerCase();
+        if (!byEmail.has(em)) byEmail.set(em, []);
+        byEmail.get(em)!.push(e);
+      }
+    }
+    const eventsFor = (x: Send): EventRow[] => {
+      const exact = bySend.get(x.id);
+      if (exact?.length) return exact;
+      if (x.status === 'sent') return byEmail.get(x.email.toLowerCase()) ?? [];
+      return [];
+    };
+    const trackBadges = (x: Send) => {
+      const rows = eventsFor(x);
+      if (!rows.length) return '';
+      const deliv = rows.filter((r) => r.event === 'delivered');
+      const opens = rows.filter((r) => r.event === 'opened' || r.event === 'unique_opened');
+      const clicks = rows.filter((r) => r.event === 'click' || r.event === 'clicked');
+      const out: string[] = [];
+      if (deliv.length) out.push(`<span class="chip deliv">delivered · ${esc(when(deliv[0].created_at))}</span>`);
+      if (opens.length) {
+        const count = opens.length > 1 ? ` (${opens.length}×)` : '';
+        out.push(`<span class="chip open">opened${count} · ${esc(when(opens[0].created_at))}</span>`);
+      }
+      if (clicks.length) {
+        const count = clicks.length > 1 ? ` (${clicks.length}×)` : '';
+        out.push(`<span class="chip open">clicked${count} · ${esc(when(clicks[0].created_at))}</span>`);
+      }
+      return out.length ? `<div class="trk">${out.join('')}</div>` : '';
+    };
+    const detailRow = (x: Send) => {
+      if (this.state.expandedSendId !== x.id) return '';
+      const rows = eventsFor(x)
+        .slice()
+        .sort((a, b) => a.created_at.localeCompare(b.created_at));
+      const timeline = [
+        `<div class="tl-item"><span class="tl-time">${esc(when(x.created_at))}</span><span class="tl-ev">${esc(x.status === 'queued' ? 'Queued' : 'Sent')}</span><span class="muted">template: ${esc(x.template_key)}${x.provider_id ? ` · account: ${esc(x.provider_id)}` : ''}</span></div>`,
+        ...rows.map(
+          (r) =>
+            `<div class="tl-item"><span class="tl-time">${esc(when(r.created_at))}</span><span class="tl-ev">${esc(EVENTS[r.event] ?? r.event)}</span><span class="muted">${esc(r.detail ?? '')}</span></div>`,
+        ),
+      ];
+      if (!rows.length && x.status === 'sent') {
+        timeline.push('<div class="muted">No open or delivery events recorded yet for this send.</div>');
+      }
+      return `<tr class="detail-row"><td colspan="6"><div class="tl">${timeline.join('')}</div></td></tr>`;
+    };
     return `${this.blockNote()}<div class="scroll"><table>
-      <thead><tr><th>When</th><th>To</th><th>Template</th><th>Status</th><th>Kind</th></tr></thead><tbody>${
-      list.map((x) => `<tr><td>${esc(when(x.status === 'queued' && x.due_at ? x.due_at : x.created_at))}</td><td>${esc(x.email)}</td>
-        <td>${esc(x.template_key)}</td><td class="st-${esc(x.status)}">${esc(x.status)}${x.error ? `<div class="muted">${esc(x.error)}</div>` : ''}</td>
-        <td class="muted">${x.schedule_id ? 'scheduled' : esc(x.purpose)}</td></tr>`).join('')
+      <thead><tr><th>When</th><th>To</th><th>Template</th><th>Status &amp; Open Time</th><th>Kind</th><th></th></tr></thead><tbody>${
+      list.map((x) => {
+        const isOpen = this.state.expandedSendId === x.id;
+        return `<tr><td>${esc(when(x.status === 'queued' && x.due_at ? x.due_at : x.created_at))}</td><td>${esc(x.email)}</td>
+          <td>${esc(x.template_key)}</td><td class="st-${esc(x.status)}">${esc(x.status)}${trackBadges(x)}${x.error ? `<div class="muted">${esc(x.error)}</div>` : ''}</td>
+          <td class="muted">${x.schedule_id ? 'scheduled' : esc(x.purpose)}</td>
+          <td><button class="link" data-action="toggleSend" data-id="${esc(x.id)}">${isOpen ? 'Hide' : 'Timeline'}</button></td></tr>${detailRow(x)}`;
+      }).join('')
     }</tbody></table></div>`;
   }
 

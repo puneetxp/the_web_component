@@ -1,0 +1,93 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Mail Templates &amp; Schedule Sync Demo</title>
+  <style>
+    body { margin: 0; padding: 24px 16px; background: #f1f5f9; font-family: system-ui, -apple-system, sans-serif; color: #0f172a; }
+    main { max-width: 1120px; margin: 0 auto; display: grid; gap: 16px; --the-primary: #dc2626; --the-radius: 12px; }
+    .bar { background: #fff; border: 1px solid #e2e8f0; border-radius: 12px; padding: 14px 16px; display: flex; flex-wrap: wrap; gap: 10px; align-items: center; justify-content: space-between; }
+    .bar h1 { margin: 0; font-size: 18px; }
+    .bar p { margin: 2px 0 0; font-size: 12px; color: #64748b; }
+    .controls { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+    .controls button { padding: 6px 12px; border-radius: 8px; border: 1px solid #cbd5e1; background: #fff; cursor: pointer; font-size: 12px; font-weight: 600; }
+    .controls button.on { background: #dc2626; color: #fff; border-color: #dc2626; }
+  </style>
+</head>
+<body>
+<main id="app" data-the-theme="light">
+  <div class="bar">
+    <div>
+      <h1>&lt;the-mail-templates&gt; + &lt;the-mail-schedules&gt; Interactive Demo</h1>
+      <p>Mock backend (no real emails sent). Switch site brand, preview all 7 standard templates, edit Simple Template + AI, and click Sync &amp; Schedule Job.</p>
+    </div>
+    <div class="controls">
+      <button data-site="intax" class="on">INTAX Billing</button>
+      <button data-site="intaxing">INTAXING</button>
+      <button data-site="oop">0op.in</button>
+    </div>
+  </div>
+
+  <div id="mount">
+    <the-mail-templates
+      id="tpl"
+      endpoint="/api/isuper/email-template/campaign"
+      ai-endpoint="/api/isuper/email/ai-template"
+      test-endpoint="/api/isuper/mail/send-test"
+      brand="INTAX Billing"
+      site-url="https://intax.in"
+      from="INTAX Billing <hello@intax.in>"
+      accent="#dc2626"
+      theme="light"
+      no-dark
+    ></the-mail-templates>
+  </div>
+
+  <the-mail-schedules id="sch" endpoint="/api/isuper/email-template/campaign" theme="light" no-dark></the-mail-schedules>
+</main>
+
+<script src="./mock-backend.js"></script>
+<script type="module">
+  import "../src/index.ts";
+
+  const app = document.getElementById("app");
+  const sch = document.getElementById("sch");
+  const mount = document.getElementById("mount");
+
+  app.addEventListener("the-template-saved", () => sch.reload());
+  app.addEventListener("the-template-deleted", () => sch.reload());
+  app.addEventListener("the-schedule-template", (e) => {
+    const d = e.detail || {};
+    sch.openNewSchedule({ template: d.key, sourceType: d.sourceType });
+    sch.scrollIntoView({ behavior: "smooth", block: "start" });
+  });
+
+  const SITES = {
+    intax: { brand: "INTAX Billing", url: "https://intax.in", from: "INTAX Billing <hello@intax.in>", accent: "#dc2626" },
+    intaxing: { brand: "INTAXING", url: "https://intaxing.in", from: "INTAXING <hello@intaxing.in>", accent: "#4f46e5" },
+    oop: { brand: "0op.in", url: "https://0op.in", from: "0op.in Catalog <hello@0op.in>", accent: "#059669" },
+  };
+
+  document.querySelectorAll("[data-site]").forEach((btn) => {
+    btn.addEventListener("click", () => {
+      document.querySelectorAll("[data-site]").forEach((b) => b.classList.remove("on"));
+      btn.classList.add("on");
+      const s = SITES[btn.dataset.site];
+      app.style.setProperty("--the-primary", s.accent);
+      mount.innerHTML = `<the-mail-templates
+        endpoint="/api/isuper/email-template/campaign"
+        ai-endpoint="/api/isuper/email/ai-template"
+        test-endpoint="/api/isuper/mail/send-test"
+        brand="${s.brand}"
+        site-url="${s.url}"
+        from="${s.from}"
+        accent="${s.accent}"
+        theme="light"
+        no-dark
+      ></the-mail-templates>`;
+    });
+  });
+</script>
+</body>
+</html>

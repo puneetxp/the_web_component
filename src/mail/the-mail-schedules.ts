@@ -30,9 +30,21 @@ interface Template {
   name: string;
   subject: string;
 }
+interface FacetRow {
+  value: string;
+  count: number;
+}
+interface Facets {
+  total: number;
+  never_mailed: number;
+  categories: FacetRow[];
+  states: FacetRow[];
+  source_types: FacetRow[];
+}
 interface State {
   list: Schedule[] | null;
   templates: Template[];
+  facets: Facets | null;
   error: string;
   notice: string;
   busy: string;
@@ -41,7 +53,15 @@ interface State {
   city: string;
   region: string;
   category: string;
+  sourceType: string;
+  q: string;
   minScore: string;
+  maxScore: string;
+  professionals: 'exclude' | 'include' | 'only';
+  registeredFrom: string;
+  registeredTo: string;
+  neverMailed: boolean;
+  cooldownDays: string;
   startDate: string;
   days: number[];
   from: string;
@@ -55,6 +75,7 @@ export class TheMailSchedules extends TheElement<State> {
   protected state: State = {
     list: null,
     templates: [],
+    facets: null,
     error: '',
     notice: '',
     busy: '',
@@ -63,7 +84,15 @@ export class TheMailSchedules extends TheElement<State> {
     city: '',
     region: '',
     category: '',
+    sourceType: '',
+    q: '',
     minScore: '',
+    maxScore: '',
+    professionals: 'exclude',
+    registeredFrom: '',
+    registeredTo: '',
+    neverMailed: true,
+    cooldownDays: '365',
     startDate: localDate(),
     days: [1, 2, 3, 4, 5, 6],
     from: '09:00',
@@ -92,13 +121,37 @@ export class TheMailSchedules extends TheElement<State> {
     await this.load();
   }
 
+  /** Public method for host apps to refresh schedules, templates & lead facets. */
+  public async reload() {
+    await this.load();
+  }
+
+  /** Public method: sync templates from the_campaign and open the New Schedule form pre-filled. */
+  public async openNewSchedule(opts: { template: string; sourceType?: string; category?: string }) {
+    await this.load();
+    this.set({
+      adding: true,
+      template: opts.template || this.state.template,
+      sourceType: opts.sourceType !== undefined ? opts.sourceType : this.state.sourceType,
+      category: opts.category !== undefined ? opts.category : this.state.category,
+      error: '',
+      notice: `Template "${opts.template}" synced from the_campaign. Set your lead filters and window below, then click Create schedule.`,
+    });
+  }
+
   private async load() {
     const api = this.api();
-    const [s, t] = await Promise.all([
+    const [s, t, facets] = await Promise.all([
       api.get<{ schedules: Schedule[] }>(`${this.endpoint()}/v1/schedules`),
       api.get<{ templates: Template[] }>(`${this.endpoint()}/v1/templates`),
+      api.get<Facets>(`${this.endpoint()}/v1/leads/facets`).catch(() => null),
     ]);
-    this.set({ list: s.schedules ?? [], templates: t.templates ?? [], template: this.state.template || t.templates?.[0]?.tpl_key || '' });
+    this.set({
+      list: s.schedules ?? [],
+      templates: t.templates ?? [],
+      facets,
+      template: this.state.template || t.templates?.[0]?.tpl_key || '',
+    });
   }
 
   private async create() {
@@ -107,7 +160,16 @@ export class TheMailSchedules extends TheElement<State> {
     if (s.city.trim()) filter['city'] = s.city.trim();
     if (s.region.trim()) filter['state'] = s.region.trim();
     if (s.category.trim()) filter['category'] = s.category.trim();
+    if (s.sourceType.trim()) filter['source_type'] = s.sourceType.trim();
+    if (s.q.trim()) filter['q'] = s.q.trim();
     if (s.minScore.trim()) filter['min_score'] = Number(s.minScore);
+    if (s.maxScore.trim()) filter['max_score'] = Number(s.maxScore);
+    if (s.professionals === 'include') filter['include_professionals'] = true;
+    if (s.professionals === 'only') filter['professionals_only'] = true;
+    if (s.registeredFrom) filter['registered_from'] = s.registeredFrom;
+    if (s.registeredTo) filter['registered_to'] = s.registeredTo;
+    if (s.neverMailed) filter['never_mailed'] = true;
+    if (s.cooldownDays.trim() !== '') filter['cooldown_days'] = Number(s.cooldownDays);
     this.set({ busy: 'create', error: '', notice: '' });
     const r = await this.api().post<{ schedule: Schedule }>(`${this.endpoint()}/v1/schedules`, {
       template: s.template,
@@ -161,15 +223,33 @@ export class TheMailSchedules extends TheElement<State> {
   private formView(): string {
     const s = this.state;
     const tpl = Object.fromEntries(s.templates.map((t) => [t.tpl_key, `${t.name} · ${t.subject}`]));
+    const profOpts = {
+      exclude: 'Exclude professionals (CA / tax)',
+      include: 'Include professionals',
+      only: 'Professionals only',
+    };
+    const datalist = (id: string, rows: FacetRow[] | undefined) =>
+      `<datalist id="${id}">${(rows ?? []).map((r) => `<option value="${esc(r.value)}">${esc(r.value)} (${r.count})</option>`).join('')}</datalist>`;
     return `
 <div class="soft stack">
   <label>Template<select data-model="template">${options(tpl, s.template)}</select></label>
   <div class="grid">
+    <label>Professionals<select data-model="professionals">${options(profOpts, s.professionals)}</select></label>
+    <label>Source (optional)<input list="tc-src-list" data-model="sourceType" value="${esc(s.sourceType)}" placeholder="e.g. MCA, GST"></label>
+    <label>Registered from<input type="date" data-model="registeredFrom" value="${esc(s.registeredFrom)}"></label>
+    <label>Registered to<input type="date" data-model="registeredTo" value="${esc(s.registeredTo)}"></label>
+    <label>Category (optional)<input list="tc-cat-list" data-model="category" value="${esc(s.category)}" placeholder="e.g. Manufacturing & Industrial"></label>
+    <label>State (optional)<input list="tc-state-list" data-model="region" value="${esc(s.region)}"></label>
     <label>City (optional)<input data-model="city" value="${esc(s.city)}"></label>
-    <label>State (optional)<input data-model="region" value="${esc(s.region)}"></label>
-    <label>Category (optional)<input data-model="category" value="${esc(s.category)}" placeholder="e.g. Manufacturing & Industrial"></label>
+    <label>Keyword search (optional)<input data-model="q" value="${esc(s.q)}" placeholder="name, GSTIN, email..."></label>
     <label>Min. lead score<input type="number" min="0" max="100" data-model="minScore" value="${esc(s.minScore)}"></label>
+    <label>Max. lead score<input type="number" min="0" max="100" data-model="maxScore" value="${esc(s.maxScore)}"></label>
+    <label>Cross-business cooldown (days)<input type="number" min="0" max="3650" data-model="cooldownDays" value="${esc(s.cooldownDays)}"></label>
+    <label class="row" style="align-items:center;gap:6px;padding-top:18px"><input type="checkbox" data-model="neverMailed" ${s.neverMailed ? 'checked' : ''} style="width:auto"> Never mailed only</label>
   </div>
+  ${datalist('tc-cat-list', s.facets?.categories)}
+  ${datalist('tc-state-list', s.facets?.states)}
+  ${datalist('tc-src-list', s.facets?.source_types)}
   <div class="row days">${[1, 2, 3, 4, 5, 6, 7].map((d) =>
       `<button data-action="day" data-day="${d}" class="${s.days.includes(d) ? 'on' : ''}">${DAY[d]}</button>`
     ).join('')}</div>
@@ -181,7 +261,7 @@ export class TheMailSchedules extends TheElement<State> {
   </div>
   <div class="row"><button class="primary" data-action="create" ${s.busy || !s.template || !s.days.length ? 'disabled' : ''}>${
       s.busy === 'create' ? 'Creating…' : 'Create schedule'
-    }</button><span class="muted">Leads that are blocked or already got this template are skipped.</span></div>
+    }</button><span class="muted">${s.facets ? `${s.facets.never_mailed.toLocaleString()} never-mailed of ${s.facets.total.toLocaleString()} total leads.` : 'Leads that are blocked or already got this template are skipped.'}</span></div>
 </div>`;
   }
 

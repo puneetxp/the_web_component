@@ -154,8 +154,24 @@ window.fetch = async (input, init = {}) => {
 };
 
 // ---- /v1 through the host's proxy: health, schedules, templates, sends, events, suppressions --
+const savedTemplates = [
+  {
+    tpl_key: "std-billing-intro",
+    name: "Best Billing Introduction (High-Reply)",
+    subject: 'Quick intro: simpler billing for {{ lead.business_name | default: "your business" }}',
+    tag: "standard",
+    html: '<div style="font-family:system-ui,sans-serif;max-width:600px;margin:0 auto;padding:24px;background:#fff;border:1px solid #e2e8f0;border-radius:10px;"><h2 style="margin:0 0 12px;color:#0f172a;">{{ greeting }},</h2><p style="color:#334155;line-height:1.6;">I am reaching out from INTAX Billing. We build a simple, fast GST billing and accounting workspace for Indian businesses like {{ lead.business_name | default: "yours" }}.</p><p style="color:#334155;line-height:1.6;">Reply for a quick 5-minute demo or explore <a href="https://intax.in" style="color:#dc2626;">intax.in</a>.</p><p style="color:#475569;margin-top:16px;">Warm regards,<br>Team INTAX</p></div>',
+  },
+  {
+    tpl_key: "services",
+    name: "Services intro",
+    subject: "Website, services & GST billing for your business",
+    tag: "standard",
+    html: '<div style="font-family:system-ui,sans-serif;max-width:600px;margin:0 auto;padding:24px;background:#fff;border:1px solid #e2e8f0;border-radius:10px;"><div style="background:#dc2626;color:#fff;padding:16px 20px;border-radius:8px;margin-bottom:16px;font-weight:700;">INTAX Billing</div><p style="color:#334155;">Manage GST invoices, stock ledgers, e-commerce websites, and business portfolio sites in one workspace.</p></div>',
+  },
+];
 const schedules = [
-  { id: "sch00000001", template_key: "services", status: "active", start_date: "2026-11-23", reserve: 40, filter: { min_score: 50 },
+  { id: "sch00000001", template_key: "std-billing-intro", status: "active", start_date: "2026-11-23", reserve: 40, filter: { min_score: 50 },
     window: { days: [1, 2, 3, 4, 5, 6], from: "09:00", to: "19:00", timezone: "Asia/Kolkata" },
     today: { date: "2026-11-23", planned: 60, queued: 38, sent: 21, failed: 1, next_send: new Date(Date.now() + 9 * 60e3).toISOString() } },
 ];
@@ -182,9 +198,13 @@ const blocks = [
 const before2 = window.fetch;
 window.fetch = async (input, init = {}) => {
   const url = new URL(typeof input === "string" ? input : input.url, location.href);
+  if (url.pathname.endsWith("/mail/send-test") && (init.method ?? "GET") === "POST") {
+    await wait(300);
+    return json({ success: true, id: "demo-test-" + Date.now(), dry_run: true });
+  }
   const m = /\/campaign(\/v1\/.*)$/.exec(url.pathname);
   if (!m) return before2(input, init);
-  await wait(300);
+  await wait(250);
   const path = m[1], q = url.searchParams, method = init.method ?? "GET";
   const body = init.body ? JSON.parse(init.body) : {};
   const email = (q.get("email") ?? "").toLowerCase();
@@ -197,9 +217,51 @@ window.fetch = async (input, init = {}) => {
       paused: paused.length, cooling_down: paused.filter((a) => a.resume_at).length,
       alerts: events.filter((e) => e.event === "alert").map((e) => ({ text: e.detail, at: e.created_at })) });
   }
-  if (path === "/v1/templates") {
-    return json({ templates: [{ tpl_key: "services", name: "Services intro", subject: "Free GST billing for your business" },
-      { tpl_key: "welcome", name: "Welcome", subject: "Welcome to INTAX" }] });
+  if (path === "/v1/leads/facets") {
+    return json({
+      total: 4280,
+      never_mailed: 3615,
+      categories: [
+        { value: "Wholesale & Trading", count: 1420 },
+        { value: "Manufacturing & Industrial", count: 980 },
+        { value: "Services & Consulting", count: 860 },
+        { value: "Retail & Shops", count: 640 },
+      ],
+      states: [
+        { value: "Maharashtra", count: 1120 },
+        { value: "Rajasthan", count: 840 },
+        { value: "Gujarat", count: 790 },
+        { value: "Delhi", count: 610 },
+      ],
+      source_types: [
+        { value: "MCA", count: 1850 },
+        { value: "GST", count: 1920 },
+        { value: "CSV", count: 510 },
+      ],
+    });
+  }
+  if (path === "/v1/templates" && method === "GET") {
+    return json({ templates: savedTemplates.map(({ tpl_key, name, subject, tag }) => ({ tpl_key, name, subject, tag })) });
+  }
+  const tm = /^\/v1\/templates\/(.+)$/.exec(path);
+  if (tm) {
+    const key = decodeURIComponent(tm[1]);
+    if (method === "GET") {
+      const found = savedTemplates.find((t) => t.tpl_key === key);
+      return found ? json({ template: found }) : json({ error: "not_found", message: "Template not found" }, 404);
+    }
+    if (method === "PUT") {
+      const item = { tpl_key: key, name: body.name || key, subject: body.subject || "", html: body.html || "", tag: body.tag || "custom" };
+      const idx = savedTemplates.findIndex((t) => t.tpl_key === key);
+      if (idx >= 0) savedTemplates[idx] = item;
+      else savedTemplates.unshift(item);
+      return json({ template: item });
+    }
+    if (method === "DELETE") {
+      const idx = savedTemplates.findIndex((t) => t.tpl_key === key);
+      if (idx >= 0) savedTemplates.splice(idx, 1);
+      return json({ ok: true });
+    }
   }
   if (path === "/v1/schedules" && method === "GET") return json({ schedules });
   if (path === "/v1/schedules" && method === "POST") {

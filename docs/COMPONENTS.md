@@ -29,7 +29,9 @@ host component, and bind events as `(the-save-draft)="save($event)"`. In SolidJS
 
 Attributes every component understands: `api` (backend base URL, default same site),
 `session-key` (localStorage key sent as `X-Session-Id`, default `session_id`), `theme`
-(`light` / `dark`, default follows the system).
+(`light` / `dark`, default follows the system), and `no-dark` / `dark="false"` (disables OS dark
+mode for light-only apps; you can also set `data-the-theme="light"` or `data-the-no-dark` on a
+parent container to apply it to all child components).
 
 ## Mail components and the_campaign
 
@@ -42,6 +44,7 @@ the_campaign site key and forwards an allow-list of paths:
 | the-mail-health | `{endpoint}/v1/health` | `/v1/health` |
 | the-mail-schedules | `{endpoint}/v1/schedules`, `/v1/templates` | same |
 | the-mail-log | `{endpoint}/v1/sends`, `/v1/events`, `/v1/suppressions` | same |
+| the-mail-templates | `{endpoint}/v1/templates…`, `ai-endpoint`, `test-endpoint` | `/v1/templates`, `/v1/templates/:key` |
 | the-template-studio | `/api/isuper/email-template/ai-*`, `/api/isuper/email/ai-template` | (app's own AI) |
 
 `endpoint` defaults to intaxing's `/api/isuper/email-template/campaign`. Reference PHP for intaxing:

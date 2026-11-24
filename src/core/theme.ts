@@ -69,7 +69,7 @@ button:disabled { opacity: .55; cursor: default; }
 .bar { height: 6px; border-radius: 3px; background: var(--_border); overflow: hidden; }
 .bar > span { display: block; height: 100%; background: var(--_primary); }
 @media (prefers-color-scheme: dark) {
-  :host(:not([theme="light"])) {${DARK}}
+  :host(:not([theme="light"]):not([no-dark]):not([dark="false"])) {${DARK}}
 }
-:host([theme="dark"]) {${DARK}}
+:host([theme="dark"]:not([no-dark]):not([dark="false"])) {${DARK}}
 `;

@@ -12,16 +12,39 @@
   </style>
 </head>
 <body>
-<main>
+<main id="app" data-the-theme="light">
   <h1 style="margin:0;font-size:20px">Mail admin: all components on one page (fake backend)</h1>
-  <the-mail-health compact></the-mail-health>
-  <the-mail-health></the-mail-health>
-  <the-mail-accounts></the-mail-accounts>
-  <the-mail-schedules></the-mail-schedules>
-  <the-mail-log></the-mail-log>
-  <the-template-studio></the-template-studio>
+  <the-mail-templates
+    id="tpl"
+    endpoint="/api/isuper/email-template/campaign"
+    ai-endpoint="/api/isuper/email/ai-template"
+    test-endpoint="/api/isuper/mail/send-test"
+    brand="INTAX Billing"
+    site-url="https://intax.in"
+    from="INTAX Billing <hello@intax.in>"
+    accent="#6d28d9"
+    theme="light"
+    no-dark
+  ></the-mail-templates>
+  <the-mail-health compact theme="light" no-dark></the-mail-health>
+  <the-mail-health theme="light" no-dark></the-mail-health>
+  <the-mail-accounts theme="light" no-dark></the-mail-accounts>
+  <the-mail-schedules id="sch" theme="light" no-dark></the-mail-schedules>
+  <the-mail-log theme="light" no-dark></the-mail-log>
+  <the-template-studio theme="light" no-dark></the-template-studio>
 </main>
 <script src="./mock-backend.js"></script>
-<script type="module">import "../src/index.ts";</script>
+<script type="module">
+  import "../src/index.ts";
+  const app = document.getElementById("app");
+  const sch = document.getElementById("sch");
+  app.addEventListener("the-template-saved", () => sch.reload());
+  app.addEventListener("the-template-deleted", () => sch.reload());
+  app.addEventListener("the-schedule-template", (e) => {
+    const d = e.detail || {};
+    sch.openNewSchedule({ template: d.key, sourceType: d.sourceType });
+    sch.scrollIntoView({ behavior: "smooth", block: "start" });
+  });
+</script>
 </body>
 </html>

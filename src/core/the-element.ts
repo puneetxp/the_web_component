@@ -15,6 +15,8 @@ import { THEME_CSS } from './theme';
  *   api="https://host"        base URL of the host app's backend (default: same site)
  *   session-key="session_id"  localStorage key of the session sent as X-Session-Id
  *   theme="light|dark"        force a theme (default: follows the system)
+ *   no-dark / dark="false"    disable OS dark mode (keeps light theme even on dark OS)
+ *   (or set data-the-theme="light" / data-the-no-dark on any ancestor element)
  */
 export abstract class TheElement<S extends Record<string, any>> extends HTMLElement {
   protected root: ShadowRoot;
@@ -43,6 +45,14 @@ export abstract class TheElement<S extends Record<string, any>> extends HTMLElem
   }
 
   connectedCallback() {
+    if (!this.hasAttribute('theme')) {
+      const inherited = this.closest<HTMLElement>('[data-the-theme], [data-the-no-dark]');
+      if (inherited) {
+        const t = inherited.getAttribute('data-the-theme');
+        if (t === 'light' || t === 'dark') this.setAttribute('theme', t);
+        else if (inherited.hasAttribute('data-the-no-dark')) this.setAttribute('theme', 'light');
+      }
+    }
     this.render();
     if (!this.started) {
       this.started = true;

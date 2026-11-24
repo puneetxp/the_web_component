@@ -24,7 +24,7 @@ interface Context {
   sources: Record<string, string>;
   goals: Record<string, string>;
   categories: string[];
-  templates: { id: number; name: string; subject: string; enabled: boolean; summary: string }[];
+  templates: { id: number; key?: string; name: string; subject: string; enabled: boolean; summary: string }[];
   ai: { ready: boolean; remaining_today: number; daily_limit: number; provider: string; model: string | null };
 }
 interface Ranked {
@@ -84,7 +84,11 @@ export class TheTemplateStudio extends TheElement<State> {
   protected override actions = {
     choose: () => this.choose(),
     draft: () => this.writeDraft(),
-    use: (el: HTMLElement) => this.emit('the-use-template', { id: Number(el.dataset['id']) }),
+    use: (el: HTMLElement) => {
+      const id = Number(el.dataset['id']);
+      const tpl = this.state.ctx?.templates.find((t) => t.id === id);
+      this.emit('the-use-template', { id, key: tpl?.key || tpl?.name || '', name: tpl?.name || '' });
+    },
     save: () => this.saveDraft(),
     discard: () => this.set({ draft: null, saved: '' }),
   };
@@ -143,10 +147,18 @@ export class TheTemplateStudio extends TheElement<State> {
       .rank { display: grid; grid-template-columns: 1fr auto; gap: 6px 12px; align-items: center; }
       .rank + .rank { border-top: 1px solid var(--_border); padding-top: 10px; margin-top: 10px; }
       .best { border-color: var(--_primary); }
-      .mail { background: var(--_surface); border: 1px solid var(--_border); border-radius: calc(var(--_radius) - 4px); padding: 14px; }
-      .mail p { margin: 0 0 8px; white-space: pre-wrap; }
-      .mail .hl { background: color-mix(in srgb, var(--_primary) 10%, transparent); padding: 8px 10px; border-radius: 6px; margin: 8px 0; }
-      .mail .btn { display: inline-block; background: var(--_primary); color: var(--_on-primary); padding: 6px 12px; border-radius: 6px; margin: 4px 0 10px; }
+      .mail-frame { background: #f1f5f9; border: 1px solid var(--_border); border-radius: calc(var(--_radius) - 2px); overflow: hidden; }
+      .mail-meta { background: var(--_surface); border-bottom: 1px solid var(--_border); padding: 10px 14px; font-size: 12px; color: var(--_muted); display: grid; gap: 3px; }
+      .mail-meta b { color: var(--_text); }
+      .mail-wrap { padding: 14px; }
+      .mail { background: #ffffff; color: #1e293b; border: 1px solid #e2e8f0; border-radius: 10px; overflow: hidden; max-width: 560px; margin: 0 auto; box-shadow: 0 1px 3px rgba(15,23,42,0.06); }
+      .mail-hd { background: var(--_primary); color: var(--_on-primary); padding: 14px 18px; font-weight: 700; font-size: 15px; }
+      .mail-bd { padding: 18px; }
+      .mail-bd p { margin: 0 0 10px; white-space: pre-wrap; line-height: 1.6; font-size: 14px; color: #334155; }
+      .mail-bd .heading { font-size: 16px; font-weight: 700; color: #0f172a; margin-bottom: 10px; }
+      .mail .hl { background: #f8fafc; border-left: 4px solid var(--_primary); padding: 10px 12px; border-radius: 6px; margin: 12px 0; font-size: 13px; color: #1e293b; }
+      .mail .btn { display: inline-block; background: var(--_primary); color: var(--_on-primary); padding: 9px 16px; border-radius: 7px; margin: 8px 0 12px; font-size: 13px; font-weight: 600; text-decoration: none; }
+      .mail-ft { background: #f8fafc; border-top: 1px solid #e2e8f0; padding: 10px 18px; font-size: 11px; color: #64748b; }
     `;
   }
 
@@ -199,13 +211,25 @@ export class TheTemplateStudio extends TheElement<State> {
     const paras = d.message.split(/\n{2,}/).map((p) => `<p>${esc(p)}</p>`).join('');
     return `
 <div class="soft stack">
-  <div class="row"><h4>New email (draft)</h4><span class="spread"></span><span class="muted">Subject: ${esc(d.subject)}</span></div>
-  <div class="mail">
-    ${d.heading ? `<p><b>${esc(d.heading)}</b></p>` : ''}
-    ${paras}
-    ${d.highlight ? `<div class="hl">${esc(d.highlight)}</div>` : ''}
-    ${d.buttonText ? `<span class="btn">${esc(d.buttonText)}</span>` : ''}
-    ${d.signoff ? `<p class="muted">${esc(d.signoff)}</p>` : ''}
+  <div class="row"><h4>New email (draft preview)</h4><span class="spread"></span><span class="muted">Subject: ${esc(d.subject)}</span></div>
+  <div class="mail-frame">
+    <div class="mail-meta">
+      <div>From: <b>INTAX Billing &lt;hello@intax.in&gt;</b></div>
+      <div>Subject: <b>${esc(d.subject)}</b></div>
+    </div>
+    <div class="mail-wrap">
+      <div class="mail">
+        <div class="mail-hd">INTAX Billing</div>
+        <div class="mail-bd">
+          ${d.heading ? `<div class="heading">${esc(d.heading)}</div>` : ''}
+          ${paras}
+          ${d.highlight ? `<div class="hl">${esc(d.highlight)}</div>` : ''}
+          ${d.buttonText ? `<span class="btn">${esc(d.buttonText)}</span>` : ''}
+          ${d.signoff ? `<p style="margin-top:14px;color:#475569">${esc(d.signoff)}</p>` : ''}
+        </div>
+        <div class="mail-ft">Sent via INTAX Billing • GST Invoicing, Inventory &amp; Business Catalog</div>
+      </div>
+    </div>
   </div>
   <div class="row">
     <label class="spread">Template name<input data-model="draftName" value="${esc(this.state.draftName)}"></label>
